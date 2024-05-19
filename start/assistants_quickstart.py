@@ -23,21 +23,42 @@ file = upload_file("../data/airbnb-faq.pdf")
 # --------------------------------------------------------------
 # Create assistant
 # --------------------------------------------------------------
-def create_assistant(file):
+def create_assistant():
     """
     You currently cannot set the temperature for Assistant via the API.
     """
     assistant = client.beta.assistants.create(
         name="WhatsApp Carmesi Assistant",
-        instructions="You're a helpful WhatsApp assistant that can assist guests that are staying in our Paris AirBnb. Use your knowledge base to best respond to customer queries. If you don't know the answer, say simply that you cannot help with question and advice to contact the host directly. Be friendly and funny.",
-        tools=[{"type": "retrieval"}],
-        model="gpt-4-1106-preview",
-        file_ids=[file.id],
+        instructions="You're a helpful WhatsApp assistant that can assist guests that wants to buy something from Carmesi Store. Use your knowledge base to best respond to customer queries. If you don't know the answer, say simply that you cannot help with question and advice to contact the host directly. Be friendly and funny.",
+        tools=[{"type": "file_search"}],
+        model="gpt-4o",
     )
     return assistant
 
+assistant = create_assistant()
 
-assistant = create_assistant(file)
+
+# Create a vector store caled "Financial Statements"
+vector_store = client.beta.vector_stores.create(name="CarmesiDB")
+
+# Ready the files for upload to OpenAI
+file_paths = ["airbnb-faq.pdf"]
+file_streams = [open(path, "rb") for path in file_paths]
+
+# Use the upload and poll SDK helper to upload the files, add them to the vector store,
+# and poll the status of the file batch for completion.
+file_batch = client.beta.vector_stores.file_batches.upload_and_poll(
+    vector_store_id=vector_store.id, files=file_streams
+)
+
+# You can print the status and the file counts of the batch to see the result of this operation.
+print(file_batch.status)
+print(file_batch.file_counts)
+
+assistant = client.beta.assistants.update(
+  assistant_id=assistant.id,
+  tool_resources={"file_search": {"vector_store_ids": [vector_store.id]}},
+)
 
 
 # --------------------------------------------------------------
